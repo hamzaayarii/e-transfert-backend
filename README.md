@@ -206,13 +206,6 @@ kubectl logs -f <pod-name>
 - `CONFIG_SERVER_URL=http://config-server:8888`
 - Base de données PostgreSQL externe
 
-## 📞 Support
-
-- Vérifier que PostgreSQL est démarré
-- Consulter les logs Eureka pour le registry des services
-- Vérifier la configuration dans Config Server
-- Tester les endpoints via API Gateway
-
 ---
 
 **Version** : 1.0.0  
