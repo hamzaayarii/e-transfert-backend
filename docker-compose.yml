@@ -1,0 +1,174 @@
+services:
+  config-server:
+    build:
+      context: ./config-server
+      dockerfile: Dockerfile
+    container_name: config-server
+    ports:
+      - "8888:8888"
+    env_file:
+      - config-server.env
+    environment:
+      SPRING_APPLICATION_NAME: config-server
+      SPRING_PROFILES_ACTIVE: git
+      SPRING_CLOUD_CONFIG_SERVER_GIT_URI: https://github.com/raeftabarki/etrade-config-repo
+      SPRING_CLOUD_CONFIG_SERVER_GIT_DEFAULT_LABEL: main
+      SPRING_CLOUD_CONFIG_SERVER_GIT_CLONE_ON_START: "true"
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka/
+    networks:
+      - etrade-net
+
+  eureka-server:
+    build:
+      context: ./eureka-server
+      dockerfile: Dockerfile
+    container_name: eureka-server
+    ports:
+      - "8761:8761"
+    environment:
+      SPRING_APPLICATION_NAME: eureka-server
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka/
+    depends_on:
+      - config-server
+    networks:
+      - etrade-net
+
+  api-gateway:
+    build:
+      context: ./api-gateway
+      dockerfile: Dockerfile
+    container_name: api-gateway
+    ports:
+      - "9000:9000"  # Change to 9000:9000 for clarity
+    environment:
+      SPRING_APPLICATION_NAME: api-gateway
+      SERVER_PORT: 9000  # Add this
+      SPRING_CONFIG_IMPORT: optional:configserver:http://config-server:8888/
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka/
+    depends_on:
+      - eureka-server
+      - config-server
+    networks:
+      - etrade-net
+  auth-service:
+    build:
+      context: ./Auth-service
+      dockerfile: Dockerfile
+    container_name: auth-service
+    ports:
+      - "8082:8082"
+    depends_on:
+      - eureka-server
+      - config-server
+      - postgres-db
+    environment:
+      SPRING_APPLICATION_NAME: auth-service
+      SPRING_CONFIG_IMPORT: optional:configserver:http://config-server:8888/
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka/
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-db:5432/etrade
+      SPRING_DATASOURCE_USERNAME: etrade_user
+      SPRING_DATASOURCE_PASSWORD: etrade_pass
+    networks:
+      - etrade-net
+
+  user-service:
+    build:
+      context: ./user-service
+      dockerfile: Dockerfile
+    container_name: user-service
+    ports:
+      - "8081:8081"
+    depends_on:
+      - eureka-server
+      - config-server
+      - postgres-db
+    environment:
+      SPRING_APPLICATION_NAME: user-service
+      SPRING_CONFIG_IMPORT: optional:configserver:http://config-server:8888/
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka/
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-db:5432/etrade
+      SPRING_DATASOURCE_USERNAME: etrade_user
+      SPRING_DATASOURCE_PASSWORD: etrade_pass
+    networks:
+      - etrade-net
+
+  transfer-service:
+    build:
+      context: ./transfer-service
+      dockerfile: Dockerfile
+    container_name: transfer-service
+    ports:
+      - "8084:8084"
+    depends_on:
+      - eureka-server
+      - postgres-db
+    environment:
+      SPRING_APPLICATION_NAME: transfer-service
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka/
+      EUREKA_INSTANCE_PREFER-IP-ADDRESS: "true"
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-db:5432/etrade
+      SPRING_DATASOURCE_USERNAME: etrade_user
+      SPRING_DATASOURCE_PASSWORD: etrade_pass
+    networks:
+      - etrade-net
+
+  notification-service:
+    build:
+      context: ./notification-service
+      dockerfile: Dockerfile
+    container_name: notification-service
+    ports:
+      - "8085:8085"
+    depends_on:
+      - eureka-server
+      - config-server
+      - postgres-db
+    environment:
+      SPRING_APPLICATION_NAME: notification-service
+      SPRING_CONFIG_IMPORT: optional:configserver:http://config-server:8888/
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka/
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-db:5432/etrade
+      SPRING_DATASOURCE_USERNAME: etrade_user
+      SPRING_DATASOURCE_PASSWORD: etrade_pass
+    networks:
+      - etrade-net
+
+  appointment-service:
+    build:
+      context: ./appointment-service
+      dockerfile: Dockerfile
+    container_name: appointment-service
+    ports:
+      - "8083:8083"
+    depends_on:
+      - eureka-server
+      - postgres-db
+    environment:
+      SPRING_APPLICATION_NAME: appointment-service
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka/
+      EUREKA_INSTANCE_PREFER-IP-ADDRESS: "true"
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-db:5432/etrade
+      SPRING_DATASOURCE_USERNAME: etrade_user
+      SPRING_DATASOURCE_PASSWORD: etrade_pass
+    networks:
+      - etrade-net
+
+  postgres-db:
+    image: postgres:15
+    container_name: postgres-db
+    environment:
+      POSTGRES_DB: etrade
+      POSTGRES_USER: etrade_user
+      POSTGRES_PASSWORD: etrade_pass
+    ports:
+      - "5432:5432"
+    networks:
+      - etrade-net
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+
+networks:
+  etrade-net:
+
+volumes:
+  postgres-data:
